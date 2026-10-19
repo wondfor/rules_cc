@@ -1,121 +1,18 @@
 version: 2.1
+setup: true
 
-executors:
-  bazel:
-    docker:
-      - image: gcr.io/bazel-public/bazel:latest
-    resource_class: medium
-    working_directory: ~/project
+orbs:
+  continuation: circleci/continuation@0.3.1
 
 jobs:
-  build:
-    executor: bazel
+  setup:
+    executor: continuation/default
     steps:
       - checkout
-      - run:
-          name: Build all targets
-          command: |
-            bazel build \
-              //:all \
-              //cc:all \
-              //cc/private/rules_impl:all \
-              //cc/private/toolchain:all \
-              //distro:all \
-              //examples:all \
-              //examples/my_c_archive:all \
-              //examples/my_c_compile:all \
-              //examples/write_cc_toolchain_cpu:all \
-              //tools/migration:all \
-              //tools/runfiles:all
-
-  test:
-    executor: bazel
-    steps:
-      - checkout
-      - run:
-          name: Run all tests
-          command: |
-            bazel test \
-              --test_timeout=120 \
-              //:all \
-              //cc:all \
-              //cc/private/rules_impl:all \
-              //cc/private/toolchain:all \
-              //distro:all \
-              //examples:all \
-              //examples/my_c_archive:all \
-              //examples/my_c_compile:all \
-              //examples/write_cc_toolchain_cpu:all \
-              //tools/migration:all \
-              //tools/runfiles:all
-      - run:
-          name: Store test results
-          when: always
-          command: |
-            mkdir -p /tmp/test-results
-            find bazel-testlogs -name "test.xml" -exec cp --parents {} /tmp/test-results/ \; 2>/dev/null || true
-      - store_test_results:
-          path: /tmp/test-results
-
-  test-cc-shared-library:
-    executor: bazel
-    steps:
-      - checkout
-      - run:
-          name: Build cc_shared_library examples
-          command: |
-            bazel build \
-              --experimental_cc_shared_library \
-              "--//examples:incompatible_link_once=True" \
-              "--//examples:enable_permissions_check=True" \
-              //examples/test_cc_shared_library/... \
-              //examples/test_cc_shared_library/diamond_inheritance/...
-      - run:
-          name: Test cc_shared_library examples
-          command: |
-            bazel test \
-              --test_timeout=120 \
-              --experimental_cc_shared_library \
-              "--//examples:incompatible_link_once=True" \
-              "--//examples:enable_permissions_check=True" \
-              //examples/test_cc_shared_library/... \
-              //examples/test_cc_shared_library/diamond_inheritance/...
-      - run:
-          name: Store test results
-          when: always
-          command: |
-            mkdir -p /tmp/test-results
-            find bazel-testlogs -name "test.xml" -exec cp --parents {} /tmp/test-results/ \; 2>/dev/null || true
-      - store_test_results:
-          path: /tmp/test-results
-
-  lint:
-    docker:
-      - image: cimg/base:stable
-    resource_class: small
-    steps:
-      - checkout
-      - run:
-          name: Install buildifier
-          command: |
-            curl -fsSL https://github.com/bazelbuild/buildtools/releases/latest/download/buildifier-linux-amd64 \
-              -o /usr/local/bin/buildifier
-            chmod +x /usr/local/bin/buildifier
-      - run:
-          name: Run buildifier lint check
-          command: |
-            find . -name "BUILD" -o -name "BUILD.bazel" -o -name "*.bzl" -o -name "WORKSPACE" \
-              | grep -v ".git" \
-              | xargs buildifier --lint=warn --warnings=all -mode=check
+      - continuation/continue:
+          configuration_path: .circleci/continue_config.yml
 
 workflows:
-  ci:
+  setup-workflow:
     jobs:
-      - lint
-      - build
-      - test:
-          requires:
-            - build
-      - test-cc-shared-library:
-          requires:
-            - build
+      - setup
