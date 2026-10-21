@@ -1,0 +1,4 @@
+# This repo uses WORKSPACE-based dependency resolution and has not migrated to
+# bzlmod. Bazel 7+ enables bzlmod by default, which makes @rules_cc
+# unresolvable from the main repo since it is only declared in WORKSPACE.
+common --noenable_bzlmod
